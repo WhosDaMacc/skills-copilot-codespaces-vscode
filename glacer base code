@@ -1,0 +1,285 @@
+```jsx
+// Auth.js
+import React, { useState, useContext, createContext } from 'react';
+import { View, Text, TextInput, Button, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import auth from '@react-native-firebase/auth';
+
+// Initialize Google Sign-In
+GoogleSignin.configure({
+  webClientId: 'YOUR_WEB_CLIENT_ID',
+});
+
+// Auth Context
+const AuthContext = createContext();
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const authActions = {
+    // Email/Password Sign Up
+    signUp: async (email, password) => {
+      setLoading(true);
+      try {
+        await auth().createUserWithEmailAndPassword(email, password);
+      } catch (error) {
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
+
+    // Email/Password Login
+    logIn: async (email, password) => {
+      setLoading(true);
+      try {
+        await auth().signInWithEmailAndPassword(email, password);
+      } catch (error) {
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
+
+    // Google Sign-In
+    googleSignIn: async () => {
+      setLoading(true);
+      try {
+        const { idToken } = await GoogleSignin.signIn();
+        const credential = auth.GoogleAuthProvider.credential(idToken);
+        await auth().signInWithCredential(credential);
+      } catch (error) {
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
+
+    // Password Reset
+    sendPasswordReset: async (email) => {
+      setLoading(true);
+      try {
+        await auth().sendPasswordResetEmail(email);
+      } catch (error) {
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
+
+    // Logout
+    logOut: async () => {
+      setLoading(true);
+      try {
+        await auth().signOut();
+      } catch (error) {
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  // Auth state listener
+  auth().onAuthStateChanged((user) => {
+    setUser(user);
+  });
+
+  return (
+    <AuthContext.Provider value={{ user, loading, ...authActions }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export const useAuth = () => useContext(AuthContext);
+
+// Auth Screens Components
+export function AuthScreen({ navigation }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const { logIn, googleSignIn, loading } = useAuth();
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.logo}>GLACER</Text>
+      
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
+      />
+      
+      <TextInput
+        style={styles.input}
+        placeholder="Password"
+        secureTextEntry
+        value={password}
+        onChangeText={setPassword}
+      />
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#1E88E5" />
+      ) : (
+        <>
+          <Button
+            title="Login"
+            onPress={() => logIn(email, password)}
+            color="#1E88E5"
+          />
+          
+          <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
+            <Text style={styles.link}>Create Account</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => navigation.navigate('PasswordReset')}>
+            <Text style={styles.link}>Forgot Password?</Text>
+          </TouchableOpacity>
+
+          <Button
+            title="Continue with Google"
+            onPress={googleSignIn}
+            color="#0D47A1"
+          />
+        </>
+      )}
+    </View>
+  );
+}
+
+export function SignUpScreen() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const { signUp, loading } = useAuth();
+
+  const handleSignUp = async () => {
+    if (password !== confirmPassword) {
+      Alert.alert("Error", "Passwords don't match!");
+      return;
+    }
+    try {
+      await signUp(email, password);
+    } catch (error) {
+      Alert.alert("Sign Up Error", error.message);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.header}>Create Account</Text>
+      
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
+      />
+      
+      <TextInput
+        style={styles.input}
+        placeholder="Password"
+        secureTextEntry
+        value={password}
+        onChangeText={setPassword}
+      />
+      
+      <TextInput
+        style={styles.input}
+        placeholder="Confirm Password"
+        secureTextEntry
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
+      />
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#1E88E5" />
+      ) : (
+        <Button
+          title="Sign Up"
+          onPress={handleSignUp}
+          color="#1E88E5"
+        />
+      )}
+    </View>
+  );
+}
+
+export function PasswordResetScreen() {
+  const [email, setEmail] = useState('');
+  const { sendPasswordReset, loading } = useAuth();
+
+  const handleReset = async () => {
+    try {
+      await sendPasswordReset(email);
+      Alert.alert("Success", "Password reset email sent!");
+    } catch (error) {
+      Alert.alert("Error", error.message);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.header}>Password Reset</Text>
+      
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
+      />
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#1E88E5" />
+      ) : (
+        <Button
+          title="Send Reset Email"
+          onPress={handleReset}
+          color="#1E88E5"
+        />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: '#E3F2FD'
+  },
+  logo: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#0D47A1',
+    textAlign: 'center',
+    marginBottom: 40
+  },
+  header: {
+    fontSize: 24,
+    color: '#1A237E',
+    marginBottom: 20,
+    textAlign: 'center'
+  },
+  input: {
+    height: 50,
+    borderColor: '#1E88E5',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 15,
+    backgroundColor: '#FFFFFF'
+  },
+  link: {
+    color: '#1E88E5',
+    textAlign: 'center',
+    marginVertical: 10
+  }
+});
+```
